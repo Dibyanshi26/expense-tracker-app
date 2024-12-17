@@ -87,9 +87,19 @@ if st.sidebar.button("Add Expense"):
 st.markdown(f"<div class='header'>💰 Expense Tracker</div>", unsafe_allow_html=True)
 
 if not st.session_state["expenses"].empty:
+    # Handle empty or invalid dates
+    valid_dates = st.session_state["expenses"]["Date"].dropna()
+    if valid_dates.empty:
+        start_date, end_date = datetime.today(), datetime.today()
+    else:
+        start_date, end_date = valid_dates.min().date(), valid_dates.max().date()
+
     # Date Range Filtering
-    start_date, end_date = st.sidebar.date_input("Filter by Date Range", value=(st.session_state["expenses"]["Date"].dt.date.min(), st.session_state["expenses"]["Date"].dt.date.max()))
-    filtered_expenses = st.session_state["expenses"][(st.session_state["expenses"]["Date"].dt.date >= start_date) & (st.session_state["expenses"]["Date"].dt.date <= end_date)]
+    date_range = st.sidebar.date_input("Filter by Date Range", value=(start_date, end_date))
+    filtered_expenses = st.session_state["expenses"][
+        (st.session_state["expenses"]["Date"].dt.date >= date_range[0]) &
+        (st.session_state["expenses"]["Date"].dt.date <= date_range[1])
+    ]
 
     st.subheader("📋 Recorded Expenses")
     st.dataframe(filtered_expenses, use_container_width=True)
@@ -107,41 +117,19 @@ if not st.session_state["expenses"].empty:
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # Visualization - Pie Chart
-    st.subheader("🍰 Expense Breakdown")
-    fig_pie = px.pie(filtered_expenses, names="Category", values="Amount", title="Expense Breakdown",
-                     color_discrete_sequence=colors['chart_colors'])
-    fig_pie.update_layout(
-        legend=dict(font=dict(color=colors['axis_text'])),
-        paper_bgcolor=colors['chart_bg']
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
-
     # Visualization - Expense Trends Over Time
     st.subheader("📈 Expense Trends Over Time")
-    if "Date" in st.session_state["expenses"] and not st.session_state["expenses"].empty:
-        expenses_sorted = filtered_expenses.sort_values(by="Date")
-        fig_line = px.line(expenses_sorted, x="Date", y="Amount", title="Expense Trends Over Time",
-                           markers=True, color_discrete_sequence=[colors['header']])
-        fig_line.update_layout(
-            xaxis=dict(title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
-            yaxis=dict(title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
-            paper_bgcolor=colors['chart_bg'],
-            plot_bgcolor=colors['chart_bg'],
-            legend=dict(font=dict(color=colors['axis_text']))
-        )
-        st.plotly_chart(fig_line, use_container_width=True)
-
-    # Summary Stats
-    st.subheader("📊 Key Statistics")
-    total_expenses = filtered_expenses["Amount"].sum()
-    avg_expense = filtered_expenses["Amount"].mean()
-    max_expense = filtered_expenses.iloc[filtered_expenses["Amount"].idxmax()] if not filtered_expenses.empty else None
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Expenses", f"${total_expenses:,.2f}")
-    col2.metric("Average Expense", f"${avg_expense:,.2f}")
-    col3.metric("Highest Expense", f"${max_expense['Amount']:,.2f}" if max_expense is not None else "-", f"Category: {max_expense['Category']}" if max_expense is not None else "-")
+    expenses_sorted = filtered_expenses.sort_values(by="Date")
+    fig_line = px.line(expenses_sorted, x="Date", y="Amount", title="Expense Trends Over Time",
+                       markers=True, color_discrete_sequence=[colors['header']])
+    fig_line.update_layout(
+        xaxis=dict(title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
+        yaxis=dict(title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
+        legend=dict(font=dict(color=colors['axis_text'])),
+        paper_bgcolor=colors['chart_bg'],
+        plot_bgcolor=colors['chart_bg']
+    )
+    st.plotly_chart(fig_line, use_container_width=True)
 else:
     st.info("No expenses added yet. Use the sidebar to add new expenses.")
 
