@@ -21,7 +21,8 @@ theme_colors = {
         "text": "#333333",
         "button": "#5F9EA0",
         "chart_bg": "#FFFFFF",
-        "chart_colors": px.colors.sequential.Blues
+        "chart_colors": px.colors.sequential.Blues,
+        "axis_text": "#000000"
     },
     "dark": {
         "bg": "#2F021B",
@@ -29,7 +30,8 @@ theme_colors = {
         "text": "#EAD3CB",
         "button": "#5E0435",
         "chart_bg": "#D6CADD",
-        "chart_colors": ["#8D0650", "#7E0647", "#6E053E", "#5E0435", "#4F042D", "#3F0324"]
+        "chart_colors": ["#8D0650", "#7E0647", "#6E053E", "#5E0435", "#4F042D", "#3F0324"],
+        "axis_text": "#000000"
     }
 }
 
@@ -52,7 +54,9 @@ DATA_FILE = "expenses.csv"
 if "expenses" not in st.session_state:
     try:
         st.session_state["expenses"] = pd.read_csv(DATA_FILE)
-        st.session_state["expenses"]["Date"] = pd.to_datetime(st.session_state["expenses"]["Date"])
+        st.session_state["expenses"]["Date"] = pd.to_datetime(
+            st.session_state["expenses"]["Date"], format="%Y-%m-%d", errors="coerce"
+        )
     except FileNotFoundError:
         st.session_state["expenses"] = pd.DataFrame(columns=["Date", "Category", "Amount", "Description"])
 
@@ -61,7 +65,7 @@ st.sidebar.header("📤 Upload Expense File")
 uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
 if uploaded_file is not None:
     user_expenses = pd.read_csv(uploaded_file)
-    user_expenses["Date"] = pd.to_datetime(user_expenses["Date"], errors="coerce")
+    user_expenses["Date"] = pd.to_datetime(user_expenses["Date"], format="%Y-%m-%d", errors="coerce")
     st.session_state["expenses"] = user_expenses
     st.sidebar.success("✅ File Uploaded Successfully!")
 
@@ -95,13 +99,23 @@ if not st.session_state["expenses"].empty:
     fig_bar = px.bar(filtered_expenses, x="Category", y="Amount", color="Category", title="Expenses by Category",
                      color_discrete_sequence=colors['chart_colors'])
     fig_bar.update_layout(
-        xaxis=dict(showgrid=False, title_font=dict(color="black"), tickfont=dict(color="black")),
-        yaxis=dict(showgrid=False, title_font=dict(color="black"), tickfont=dict(color="black")),
+        xaxis=dict(showgrid=False, title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
+        yaxis=dict(showgrid=False, title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
+        legend=dict(font=dict(color=colors['axis_text'])),
         paper_bgcolor=colors['chart_bg'],
-        plot_bgcolor=colors['chart_bg'],
-        legend=dict(font=dict(color="black"))
+        plot_bgcolor=colors['chart_bg']
     )
     st.plotly_chart(fig_bar, use_container_width=True)
+
+    # Visualization - Pie Chart
+    st.subheader("🍰 Expense Breakdown")
+    fig_pie = px.pie(filtered_expenses, names="Category", values="Amount", title="Expense Breakdown",
+                     color_discrete_sequence=colors['chart_colors'])
+    fig_pie.update_layout(
+        legend=dict(font=dict(color=colors['axis_text'])),
+        paper_bgcolor=colors['chart_bg']
+    )
+    st.plotly_chart(fig_pie, use_container_width=True)
 
     # Visualization - Expense Trends Over Time
     st.subheader("📈 Expense Trends Over Time")
@@ -110,13 +124,24 @@ if not st.session_state["expenses"].empty:
         fig_line = px.line(expenses_sorted, x="Date", y="Amount", title="Expense Trends Over Time",
                            markers=True, color_discrete_sequence=[colors['header']])
         fig_line.update_layout(
-            xaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black")),
-            yaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black")),
+            xaxis=dict(title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
+            yaxis=dict(title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
             paper_bgcolor=colors['chart_bg'],
             plot_bgcolor=colors['chart_bg'],
-            legend=dict(font=dict(color="black"))
+            legend=dict(font=dict(color=colors['axis_text']))
         )
         st.plotly_chart(fig_line, use_container_width=True)
+
+    # Summary Stats
+    st.subheader("📊 Key Statistics")
+    total_expenses = filtered_expenses["Amount"].sum()
+    avg_expense = filtered_expenses["Amount"].mean()
+    max_expense = filtered_expenses.iloc[filtered_expenses["Amount"].idxmax()] if not filtered_expenses.empty else None
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Expenses", f"${total_expenses:,.2f}")
+    col2.metric("Average Expense", f"${avg_expense:,.2f}")
+    col3.metric("Highest Expense", f"${max_expense['Amount']:,.2f}" if max_expense is not None else "-", f"Category: {max_expense['Category']}" if max_expense is not None else "-")
 else:
     st.info("No expenses added yet. Use the sidebar to add new expenses.")
 
