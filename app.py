@@ -4,7 +4,7 @@ import plotly.express as px
 from datetime import datetime
 
 # Page Configuration
-st.set_page_config(page_title="Expenses Tracker", layout="wide", page_icon="💰", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Enhanced Expenses Tracker", layout="wide", page_icon="💰", initial_sidebar_state="expanded")
 
 # Theme Toggle
 if "theme" not in st.session_state:
@@ -13,31 +13,14 @@ if "theme" not in st.session_state:
 def set_theme():
     st.session_state["theme"] = "dark" if st.session_state["theme"] == "light" else "light"
 
-# Color Palettes for Light and Dark Themes
+# Theme Colors
 theme_colors = {
-    "light": {
-        "bg": "#F7F7F7",
-        "header": "#4682B4",
-        "text": "#333333",
-        "button": "#5F9EA0",
-        "chart_bg": "#FFFFFF",
-        "chart_colors": px.colors.sequential.Blues,
-        "axis_text": "#000000"
-    },
-    "dark": {
-        "bg": "#2F021B",
-        "header": "#8D0650",
-        "text": "#EAD3CB",
-        "button": "#5E0435",
-        "chart_bg": "#D6CADD",
-        "chart_colors": ["#8D0650", "#7E0647", "#6E053E", "#5E0435", "#4F042D", "#3F0324"],
-        "axis_text": "#000000"
-    }
+    "light": {"bg": "#F7F7F7", "header": "#4682B4", "text": "#333333", "button": "#5F9EA0"},
+    "dark": {"bg": "#2F021B", "header": "#8D0650", "text": "#EAD3CB", "button": "#5E0435"}
 }
-
 colors = theme_colors[st.session_state["theme"]]
 
-# Apply Custom Styles Based on Theme
+# Apply Theme
 st.markdown(f"""
     <style>
         body {{ background-color: {colors['bg']}; color: {colors['text']}; }}
@@ -45,94 +28,80 @@ st.markdown(f"""
         .stButton>button {{ background-color: {colors['button']}; color: white; border-radius: 8px; }}
     </style>
 """, unsafe_allow_html=True)
-
-# Theme Toggle Button
 st.sidebar.button("Toggle Light/Dark Mode", on_click=set_theme)
 
-# Data Storage
+# Load Data
 DATA_FILE = "expenses.csv"
-if "expenses" not in st.session_state:
-    try:
-        st.session_state["expenses"] = pd.read_csv(DATA_FILE)
-        st.session_state["expenses"]["Date"] = pd.to_datetime(
-            st.session_state["expenses"]["Date"], format="%Y-%m-%d", errors="coerce"
-        )
-    except FileNotFoundError:
-        st.session_state["expenses"] = pd.DataFrame(columns=["Date", "Category", "Amount", "Description"])
+try:
+    df = pd.read_csv(DATA_FILE)
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+except FileNotFoundError:
+    st.error("Expenses file not found! Please upload your CSV file.")
+    st.stop()
 
-# Upload Custom Expense File
-st.sidebar.header("📤 Upload Expense File")
-uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
-if uploaded_file is not None:
-    user_expenses = pd.read_csv(uploaded_file)
-    user_expenses["Date"] = pd.to_datetime(user_expenses["Date"], format="%Y-%m-%d", errors="coerce")
-    st.session_state["expenses"] = user_expenses
-    st.sidebar.success("✅ File Uploaded Successfully!")
+# Sidebar Filters
+st.sidebar.header("📤 Filters & Additions")
+date_range = st.sidebar.date_input("Filter by Date Range", [df["Date"].min(), df["Date"].max()])
+subcategory = st.sidebar.multiselect("Select Subcategory", df["Subcategory"].unique())
+payment_method = st.sidebar.multiselect("Select Payment Method", df["Payment Method"].unique())
 
-# Sidebar Inputs
-st.sidebar.header("➕ Add New Expense")
-date = st.sidebar.date_input("Date", datetime.today())
-category = st.sidebar.selectbox("Category", ["Food", "Transport", "Entertainment", "Bills", "Utilities", "Shopping", "Miscellaneous"])
-amount = st.sidebar.number_input("Amount", min_value=0.0, step=0.01)
-description = st.sidebar.text_input("Description")
+filtered_df = df[(df["Date"].between(*date_range))]
+if subcategory:
+    filtered_df = filtered_df[filtered_df["Subcategory"].isin(subcategory)]
+if payment_method:
+    filtered_df = filtered_df[filtered_df["Payment Method"].isin(payment_method)]
 
-if st.sidebar.button("Add Expense"):
-    new_expense = {"Date": date, "Category": category, "Amount": amount, "Description": description}
-    st.session_state["expenses"] = pd.concat([st.session_state["expenses"], pd.DataFrame([new_expense])], ignore_index=True)
-    st.session_state["expenses"].to_csv(DATA_FILE, index=False)
-    st.sidebar.success("✅ Expense Added!")
-    st.experimental_rerun()
+# Title
+st.markdown(f"<div class='header'>💰 Enhanced Expense Tracker</div>", unsafe_allow_html=True)
 
-# Main Area
-st.markdown(f"<div class='header'>💰 Expense Tracker</div>", unsafe_allow_html=True)
+# Recorded Expenses Table
+st.subheader("📋 Recorded Expenses")
+st.dataframe(filtered_df, use_container_width=True)
 
-if not st.session_state["expenses"].empty:
-    # Handle empty or invalid dates
-    valid_dates = st.session_state["expenses"]["Date"].dropna()
-    if valid_dates.empty:
-        start_date, end_date = datetime.today(), datetime.today()
-    else:
-        start_date, end_date = valid_dates.min().date(), valid_dates.max().date()
+# Visualization - Stacked Bar Chart
+st.subheader("📊 Stacked Bar Chart: Category vs Subcategory")
+fig_stacked = px.bar(filtered_df, x="Category", y="Amount", color="Subcategory", title="Expenses by Category and Subcategory")
+st.plotly_chart(fig_stacked, use_container_width=True)
 
-    # Date Range Filtering
-    date_range = st.sidebar.date_input("Filter by Date Range", value=(start_date, end_date))
-    filtered_expenses = st.session_state["expenses"][
-        (st.session_state["expenses"]["Date"].dt.date >= date_range[0]) &
-        (st.session_state["expenses"]["Date"].dt.date <= date_range[1])
-    ]
+# Visualization - Donut Chart
+st.subheader("🍩 Donut Chart: Expense Breakdown by Tags")
+fig_donut = px.pie(filtered_df, names="Tags", values="Amount", hole=0.4, title="Expense Breakdown by Tags")
+st.plotly_chart(fig_donut, use_container_width=True)
 
-    st.subheader("📋 Recorded Expenses")
-    st.dataframe(filtered_expenses, use_container_width=True)
+# Visualization - Treemap
+st.subheader("🌳 Treemap: Expense Breakdown")
+fig_treemap = px.treemap(filtered_df, path=["Category", "Subcategory"], values="Amount", title="Expense Breakdown Treemap")
+st.plotly_chart(fig_treemap, use_container_width=True)
 
-    # Visualization - Bar Chart
-    st.subheader("📊 Expense Distribution by Category")
-    fig_bar = px.bar(filtered_expenses, x="Category", y="Amount", color="Category", title="Expenses by Category",
-                     color_discrete_sequence=colors['chart_colors'])
-    fig_bar.update_layout(
-        xaxis=dict(showgrid=False, title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
-        yaxis=dict(showgrid=False, title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
-        legend=dict(font=dict(color=colors['axis_text'])),
-        paper_bgcolor=colors['chart_bg'],
-        plot_bgcolor=colors['chart_bg']
-    )
-    st.plotly_chart(fig_bar, use_container_width=True)
+# Visualization - Area Chart
+st.subheader("📈 Area Chart: Spending Trends Over Time")
+fig_area = px.area(filtered_df, x="Date", y="Amount", color="Category", title="Spending Trends Over Time")
+st.plotly_chart(fig_area, use_container_width=True)
 
-    # Visualization - Expense Trends Over Time
-    st.subheader("📈 Expense Trends Over Time")
-    expenses_sorted = filtered_expenses.sort_values(by="Date")
-    fig_line = px.line(expenses_sorted, x="Date", y="Amount", title="Expense Trends Over Time",
-                       markers=True, color_discrete_sequence=[colors['header']])
-    fig_line.update_layout(
-        xaxis=dict(title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
-        yaxis=dict(title_font=dict(color=colors['axis_text']), tickfont=dict(color=colors['axis_text'])),
-        legend=dict(font=dict(color=colors['axis_text'])),
-        paper_bgcolor=colors['chart_bg'],
-        plot_bgcolor=colors['chart_bg']
-    )
-    st.plotly_chart(fig_line, use_container_width=True)
-else:
-    st.info("No expenses added yet. Use the sidebar to add new expenses.")
+# Visualization - Scatter Plot
+st.subheader("🔍 Scatter Plot: Amount vs Payment Method")
+fig_scatter = px.scatter(filtered_df, x="Payment Method", y="Amount", color="Category", size="Amount", title="Amount vs Payment Method")
+st.plotly_chart(fig_scatter, use_container_width=True)
+
+# Visualization - Heatmap
+st.subheader("🔥 Heatmap: Monthly Spending Patterns")
+filtered_df["Month"] = filtered_df["Date"].dt.month_name()
+filtered_df["Day"] = filtered_df["Date"].dt.day
+pivot_table = filtered_df.pivot_table(index="Month", columns="Day", values="Amount", aggfunc="sum", fill_value=0)
+fig_heatmap = px.imshow(pivot_table, labels=dict(x="Day", y="Month", color="Amount"), title="Monthly Spending Heatmap")
+st.plotly_chart(fig_heatmap, use_container_width=True)
+
+# Key Statistics
+st.subheader("📊 Key Statistics")
+total_expenses = filtered_df["Amount"].sum()
+avg_expense = filtered_df["Amount"].mean()
+max_expense_row = filtered_df.loc[filtered_df["Amount"].idxmax()]
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Expenses", f"${total_expenses:,.2f}")
+col2.metric("Average Expense", f"${avg_expense:,.2f}")
+col3.metric("Highest Expense", f"${max_expense_row['Amount']:,.2f}", f"Category: {max_expense_row['Category']}")
 
 # Footer
 st.markdown("---")
-st.markdown(f"<div style='text-align: center; font-size: 12px; color: {colors['text']};'>📊 Designed with ❤️ using Streamlit | {st.session_state['theme'].capitalize()} Theme</div>", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align: center; font-size: 12px; color: {colors['text']};'>📊 Designed with ❤️ using Streamlit | Enhanced Visuals</div>", unsafe_allow_html=True)
