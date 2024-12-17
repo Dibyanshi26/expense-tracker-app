@@ -49,31 +49,21 @@ st.sidebar.button("Toggle Light/Dark Mode", on_click=set_theme)
 
 # Data Storage
 DATA_FILE = "expenses.csv"
-
-def load_expenses():
-    """Load expenses file with robust error handling."""
-    try:
-        data = pd.read_csv(DATA_FILE)
-        data["Date"] = pd.to_datetime(data["Date"], errors="coerce")
-        return data.dropna(subset=["Date"])
-    except (FileNotFoundError, pd.errors.EmptyDataError):
-        return pd.DataFrame(columns=["Date", "Category", "Amount", "Description"])
-
 if "expenses" not in st.session_state:
-    st.session_state["expenses"] = load_expenses()
+    try:
+        st.session_state["expenses"] = pd.read_csv(DATA_FILE)
+        st.session_state["expenses"]["Date"] = pd.to_datetime(st.session_state["expenses"]["Date"])
+    except FileNotFoundError:
+        st.session_state["expenses"] = pd.DataFrame(columns=["Date", "Category", "Amount", "Description"])
 
 # Upload Custom Expense File
 st.sidebar.header("📤 Upload Expense File")
 uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
 if uploaded_file is not None:
-    try:
-        user_expenses = pd.read_csv(uploaded_file)
-        user_expenses["Date"] = pd.to_datetime(user_expenses["Date"], errors="coerce")
-        user_expenses = user_expenses.dropna(subset=["Date"])  # Ensure valid dates
-        st.session_state["expenses"] = user_expenses
-        st.sidebar.success("✅ File Uploaded Successfully!")
-    except Exception as e:
-        st.sidebar.error(f"❌ Error loading file: {e}")
+    user_expenses = pd.read_csv(uploaded_file)
+    user_expenses["Date"] = pd.to_datetime(user_expenses["Date"], errors="coerce")
+    st.session_state["expenses"] = user_expenses
+    st.sidebar.success("✅ File Uploaded Successfully!")
 
 # Sidebar Inputs
 st.sidebar.header("➕ Add New Expense")
@@ -94,13 +84,8 @@ st.markdown(f"<div class='header'>💰 Expense Tracker</div>", unsafe_allow_html
 
 if not st.session_state["expenses"].empty:
     # Date Range Filtering
-    start_date, end_date = st.sidebar.date_input("Filter by Date Range", value=(
-        st.session_state["expenses"]["Date"].min().date(), st.session_state["expenses"]["Date"].max().date()
-    ))
-    filtered_expenses = st.session_state["expenses"][
-        (st.session_state["expenses"]["Date"].dt.date >= start_date) &
-        (st.session_state["expenses"]["Date"].dt.date <= end_date)
-    ]
+    start_date, end_date = st.sidebar.date_input("Filter by Date Range", value=(st.session_state["expenses"]["Date"].dt.date.min(), st.session_state["expenses"]["Date"].dt.date.max()))
+    filtered_expenses = st.session_state["expenses"][(st.session_state["expenses"]["Date"].dt.date >= start_date) & (st.session_state["expenses"]["Date"].dt.date <= end_date)]
 
     st.subheader("📋 Recorded Expenses")
     st.dataframe(filtered_expenses, use_container_width=True)
@@ -110,32 +95,28 @@ if not st.session_state["expenses"].empty:
     fig_bar = px.bar(filtered_expenses, x="Category", y="Amount", color="Category", title="Expenses by Category",
                      color_discrete_sequence=colors['chart_colors'])
     fig_bar.update_layout(
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=False),
+        xaxis=dict(showgrid=False, title_font=dict(color="black"), tickfont=dict(color="black")),
+        yaxis=dict(showgrid=False, title_font=dict(color="black"), tickfont=dict(color="black")),
         paper_bgcolor=colors['chart_bg'],
-        plot_bgcolor=colors['chart_bg']
+        plot_bgcolor=colors['chart_bg'],
+        legend=dict(font=dict(color="black"))
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
     # Visualization - Expense Trends Over Time
     st.subheader("📈 Expense Trends Over Time")
-    fig_line = px.line(filtered_expenses.sort_values(by="Date"), x="Date", y="Amount",
-                       title="Expense Trends Over Time", markers=True,
-                       color_discrete_sequence=[colors['header']])
-    fig_line.update_layout(paper_bgcolor=colors['chart_bg'], plot_bgcolor=colors['chart_bg'])
-    st.plotly_chart(fig_line, use_container_width=True)
-
-    # Summary Stats
-    st.subheader("📊 Key Statistics")
-    total_expenses = filtered_expenses["Amount"].sum()
-    avg_expense = filtered_expenses["Amount"].mean()
-    max_expense = filtered_expenses.loc[filtered_expenses["Amount"].idxmax()] if not filtered_expenses.empty else None
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Expenses", f"${total_expenses:,.2f}")
-    col2.metric("Average Expense", f"${avg_expense:,.2f}")
-    col3.metric("Highest Expense", f"${max_expense['Amount']:,.2f}" if max_expense is not None else "-", 
-                f"Category: {max_expense['Category']}" if max_expense is not None else "-")
+    if "Date" in st.session_state["expenses"] and not st.session_state["expenses"].empty:
+        expenses_sorted = filtered_expenses.sort_values(by="Date")
+        fig_line = px.line(expenses_sorted, x="Date", y="Amount", title="Expense Trends Over Time",
+                           markers=True, color_discrete_sequence=[colors['header']])
+        fig_line.update_layout(
+            xaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black")),
+            yaxis=dict(title_font=dict(color="black"), tickfont=dict(color="black")),
+            paper_bgcolor=colors['chart_bg'],
+            plot_bgcolor=colors['chart_bg'],
+            legend=dict(font=dict(color="black"))
+        )
+        st.plotly_chart(fig_line, use_container_width=True)
 else:
     st.info("No expenses added yet. Use the sidebar to add new expenses.")
 
