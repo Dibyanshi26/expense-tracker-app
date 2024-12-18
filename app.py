@@ -4,7 +4,23 @@ import plotly.express as px
 from datetime import datetime
 
 # Page Configuration
-st.set_page_config(page_title="Enhanced Expenses Tracker", layout="wide", page_icon="💰")
+st.set_page_config(
+    page_title="💰ExpenseTrackerPro💰",
+    layout="wide",
+    page_icon="💰"
+)
+
+# Custom CSS for Source Sans Pro Font
+custom_css = """
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap');
+
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Source Sans Pro', sans-serif;
+    }
+</style>
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
 
 # Gradient Color Palette
 color_palette = ["#FFECB3", "#E85285", "#6A1B9A", "#FFAA00", "#7E57C2", "#FF80AB", "#4FC3F7"]
@@ -42,7 +58,7 @@ filtered_df = df[
 ]
 
 # Main Title
-st.markdown("<h1 style='text-align: center; color: #6A1B9A;'>💰 Enhanced Expense Tracker</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #6A1B9A;'>💰 ExpenseTrackerPro 💰</h1>", unsafe_allow_html=True)
 
 # Display Filtered Data
 st.subheader("📋 Filtered Expense Records")
@@ -106,4 +122,4 @@ col3.metric("Highest Expense", f"${highest_expense['Amount']:,.2f}" if highest_e
 
 # Footer
 st.markdown("<hr>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #FF80AB;'>✨ Designed with ❤️ using Streamlit ✨</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #FF80AB;'>✨ Designed with ❤️ using Streamlit, by Dibyanshi Singh ✨</p>", unsafe_allow_html=True)
